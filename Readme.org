@@ -2,11 +2,63 @@
 
 See https://adventofcode.com/2018/
 
+All commands by default use my personal input file. You can specify a different file by giving it as an argument.
+
+** Building and running
+
+The default nix build will include binaries for every day:
+#+BEGIN_SRC bash
+$ nix-build
+/nix/store/fcckhqa9mqyh7q3sl4vpii3b8gjl56gg-aoc
+$ result/bin/aoc1
+2553
+78724
+$ result/bin/aoc2
+24980
+qysdtrkloagnfozuwujmhrbvx
+#+END_SRC
+
+Builds for specific days are also possible:
+#+BEGIN_SRC 
+$ nix-build -A aoc2
+/nix/store/hd6x5vszsa82b210rj8fx6kshr7zv6wa-aoc2-0.1.0.0
+$ result/bin/aoc2
+24980
+qysdtrkloagnfozuwujmhrbvx
+#+END_SRC
+
+** Developing
+
+By entering a nix-shell in the project root you can build all packages with ~cabal new-build~:
+#+BEGIN_SRC 
+$ nix-shell
+[nix-shell:~/aoc]$ cabal new-build aoc1
+Up to date
+[nix-shell:~/aoc]$ cabal new-run aoc2
+Up to date
+4980
+qysdtrkloagnfozuwujmhrbvx
+#+END_SRC
+
+It's also possible to use ~cabal build~:
+#+BEGIN_SRC 
+[nix-shell:~/aoc]$ cd aoc1
+[nix-shell:~/aoc/aoc1]$ cabal configure --datadir . --datasubdir .
+Resolving dependencies...
+Configuring aoc1-0.1.0.0...
+[nix-shell:~/aoc/aoc1]$ cabal run
+Preprocessing executable 'aoc1' for aoc1-0.1.0.0..
+Building executable 'aoc1' for aoc1-0.1.0.0..
+Running aoc1...
+553
+78724
+#+END_SRC
+
 ** Template creation
 
-A simple template can be created by running
+A simple template for the next day can be created by running
 
-#+BEGIN_SRC bash
+#+BEGIN_SRC
 $ ./newday 7
 Created new template in aoc7
 #+END_SRC
