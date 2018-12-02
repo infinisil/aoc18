@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+if [ -z "$1" ] || [ -e "day$1" ]; then
+	echo "Usage: create <day> creates the template for day <day> in new folder aoc<day>"
+	exit 1
+fi
+
+day=$1
+dir="aoc$day"
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+cp -r "$DIR" "$dir"
+rm "$dir/$(basename ${BASH_SOURCE[0]})"
+
+
+find "$dir" -type f \
+  -exec sed -i "s/@day@/$day/g" {} \; \
+	-exec rename @day@ "$day" {} \;
+
+echo "Created new template in $dir"
