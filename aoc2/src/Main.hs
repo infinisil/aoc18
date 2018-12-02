@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE TupleSections #-}
 
 module Main where
@@ -11,6 +12,7 @@ import           Data.Text                  (Text)
 import qualified Data.Text.IO               as TIO
 import           Data.Void
 import           Paths_aoc2
+import           System.Environment         (getArgs)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import           Text.Megaparsec.Char.Lexer
@@ -22,7 +24,9 @@ parser = many (many letterChar <* newline) <* eof
 
 main :: IO ()
 main = do
-  inputFile <- getDataFileName "input"
+  inputFile <- getArgs >>= \case
+    [] -> getDataFileName "input"
+    [file] -> return file
   contents <- TIO.readFile inputFile
   case parse parser "input" contents of
     Left err    -> print err
