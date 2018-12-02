@@ -10,6 +10,7 @@ let
   hpkgs = pkgs.haskellPackages.extend (self: super: {
     aoc1 = self.callCabal2nix "aoc1" (lib.sourceByRegex ./. [
       "^src.*$"
+      "^input$"
       "^.*\\.cabal$"
     ]) {};
   });
