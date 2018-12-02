@@ -2,17 +2,20 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 DAY=$1
-DIRNAME="aoc$DAY"
+DEST="$DIR/aoc$DAY"
 
-if [ -z "$DAY" ] || [ -e "$DIRNAME" ]; then
+if [ -z "$DAY" ] || [ -e "$DEST" ]; then
 	echo "Usage: create <day> creates the template for day <day> in new folder aoc<day>"
 	exit 1
 fi
 
-cp -r "$DIR/template" "$DIRNAME"
+cp -r "$DIR/template" "$DEST"
 
-find "$DIRNAME" -type f \
+find "$DEST" -type f \
   -exec sed -i "s/@day@/$DAY/g" {} \; \
 	-exec rename @day@ "$DAY" {} \;
 
-echo "Created new template in $DIRNAME"
+grep "aoc$DAY" "$DIR/cabal.project" >/dev/null || \
+	echo "          ./aoc$DAY" >> "$DIR/cabal.project"
+
+echo "Created new template in $DEST"
