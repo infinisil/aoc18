@@ -1,3 +1,12 @@
 * Infinisil's Advent Of Code 2018 Solutions
 
 See https://adventofcode.com/2018/
+
+** Template creation
+
+A simple template can be created by running
+
+#+BEGIN_SRC bash
+$ ./newday 7
+Created new template in aoc7
+#+END_SRC
