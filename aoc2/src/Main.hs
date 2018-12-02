@@ -42,11 +42,21 @@ checksum input = doubles * triples where
 idchecksum str = (2 `elem` charcounts, 3 `elem` charcounts) where
   charcounts = Map.elems $ Map.fromListWith (+) $ (,1) <$> str
 
+-- Because the default Metric instance for String is unfit
+-- and we can't redefine it easily, we use a String wrapper instead
+newtype Str = Str String deriving Eq
+
+instance BK.Metric Str where
+  distance (Str x) (Str y) = go x y where
+    go [] [] = 0
+    go (x:xs) (y:ys) =
+      (if x == y then 0 else 1) + go xs ys
+
 correctid :: Input -> String
 correctid = go BK.empty where
-  go tree (x:xs) = case BK.elemsDistance 1 x tree of
-    []  -> go (BK.insert x tree) xs
-    [y] -> common x y
+  go tree (x:xs) = case BK.elemsDistance 1 (Str x) tree of
+    []      -> go (BK.insert (Str x) tree) xs
+    [Str y] -> common x y
   common [] [] = []
   common (x:xs) (y:ys)
     | x == y = x : common xs ys
