@@ -3,19 +3,23 @@
 
 module Main where
 
+import           Data.Bits
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
-import qualified Data.Set                   as Set
-import           Data.Set.BKTree            (BKTree)
+import           Data.Set.BKTree            (BKTree, Metric)
 import qualified Data.Set.BKTree            as BK
-import           Data.Text                  (Text)
-import qualified Data.Text.IO               as TIO
-import           Data.Void
-import           Paths_aoc2
-import           System.Environment         (getArgs)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import           Text.Megaparsec.Char.Lexer
+
+import           Data.Char                  (chr, ord)
+import           Data.Text                  (Text)
+import qualified Data.Text.IO               as TIO
+import           Data.Void                  (Void)
+import           GHC.Word                   (Word32)
+import           Paths_aoc2                 (getDataFileName)
+import           System.Environment         (getArgs)
+import           Text.Printf                (printf)
 
 type Input = [String]
 
@@ -46,23 +50,62 @@ checksum input = doubles * triples where
 idchecksum str = (2 `elem` charcounts, 3 `elem` charcounts) where
   charcounts = Map.elems $ Map.fromListWith (+) $ (,1) <$> str
 
--- Because the default Metric instance for String is unfit
--- and we can't redefine it easily, we use a String wrapper instead
-newtype Str = Str String deriving Eq
-
-instance BK.Metric Str where
-  distance (Str x) (Str y) = go x y where
-    go [] [] = 0
-    go (x:xs) (y:ys) =
-      (if x == y then 0 else 1) + go xs ys
-
 correctid :: Input -> String
 correctid = go BK.empty where
-  go tree (x:xs) = case BK.elemsDistance 1 (Str x) tree of
-    []      -> go (BK.insert (Str x) tree) xs
-    [Str y] -> common x y
-  common [] [] = []
-  common (x:xs) (y:ys)
-    | x == y = x : common xs ys
-    | otherwise = common xs ys
+  go tree (x:xs) = case BK.elemsDistance 1 quints tree of
+    []  -> go (BK.insert quints tree) xs
+    [q] -> common x (qDecode 26 q)
+    where quints = qEncode x
+
+common [] [] = []
+common (x:xs) (y:ys)
+  | x == y = x : common xs ys
+  | otherwise = common xs ys
+
+
+
+-- Quint implementation
+-- ====================
+
+{-|
+A Quint is a way to encode Strings consisting only of maximum 32 lowercased letters. It is designed to allow for calculating the hamming distance between two of them very fast.
+
+Every Word32 contains a single bit of every character of the string. The least significant bits contain the last character.
+-}
+newtype Quint = Quint (Word32, Word32, Word32, Word32, Word32) deriving Eq
+
+instance Show Quint where
+  show (Quint (q0, q1, q2, q3, q4)) = printf "%032b\n%032b\n%032b\n%032b\n%032b" q0 q1 q2 q3 q4
+
+instance Metric Quint where
+  Quint (x0, x1, x2, x3, x4) `distance` Quint (y0, y1, y2, y3, y4) = popCount $
+    xor x0 y0 .|. xor x1 y1 .|. xor x2 y2 .|. xor x3 y3 .|. xor x4 y4
+
+setIf False _ = zeroBits
+setIf True n  = bit n
+
+qEncode :: String -> Quint
+qEncode = go (Quint (0, 0, 0, 0, 0)) where
+  go :: Quint -> String -> Quint
+  go quints [] = quints
+  go (Quint (q0, q1, q2, q3, q4)) (c:cs) = go (Quint (q0', q1', q2', q3', q4')) cs where
+    n = fromIntegral $ ord c - ord 'a'
+
+    q0' = shiftL q0 1 .|. (shiftR n 0 .&. bit 0)
+    q1' = shiftL q1 1 .|. (shiftR n 1 .&. bit 0)
+    q2' = shiftL q2 1 .|. (shiftR n 2 .&. bit 0)
+    q3' = shiftL q3 1 .|. (shiftR n 3 .&. bit 0)
+    q4' = shiftL q4 1 .|. (shiftR n 4 .&. bit 0)
+
+qDecode :: Int -> Quint -> String
+qDecode n q = reverse $ go n q where
+  go 0 _ = []
+  go k (Quint (q0, q1, q2, q3, q4)) = c : go (k-1) (Quint (shiftR q0 1, shiftR q1 1, shiftR q2 1, shiftR q3 1, shiftR q4 1)) where
+    c = chr $ ord 'a' + fromIntegral n
+
+    n = shiftL (q0 .&. bit 0) 0
+      .|. shiftL (q1 .&. bit 0) 1
+      .|. shiftL (q2 .&. bit 0) 2
+      .|. shiftL (q3 .&. bit 0) 3
+      .|. shiftL (q4 .&. bit 0) 4
 
