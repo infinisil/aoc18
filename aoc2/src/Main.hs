@@ -3,6 +3,7 @@
 
 module Main where
 
+import           Control.Monad.Random
 import           Data.Bits
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
@@ -109,3 +110,39 @@ qDecode n q = reverse $ go n q where
       .|. shiftL (q3 .&. bit 0) 3
       .|. shiftL (q4 .&. bit 0) 4
 
+
+
+-- Random generation
+-- =================
+
+randomList :: MonadRandom m => Int -> m [String]
+randomList chars = chunked chars <$> getRandomRs ('a', 'z') where
+  chunked n list = chunk : chunked n rest where
+    (chunk, rest) = splitAt n list
+
+changeLetter :: MonadRandom m => String -> m String
+changeLetter input = do
+  index <- getRandomR (0, length input - 1)
+  let oldletter = input !! index
+  newletter <- head . filter (/=oldletter) <$> getRandomRs ('a', 'z')
+  return $ replace newletter index input
+  where
+    replace :: a -> Int -> [a] -> [a]
+    replace _ _ []     = error "empty list"
+    replace v 0 (x:xs) = v : xs
+    replace v n (x:xs) = x : replace v (n-1) xs
+
+randomInput :: MonadRandom m => Int -> Int -> m (Input, String)
+randomInput len chars = do
+  list <- take (len - 1) <$> randomList chars
+  orig <- uniform list
+  changed <- changeLetter orig
+  return (list ++ [changed], common orig changed)
+
+generateInputs :: IO ()
+generateInputs = forM_ (map (*10000) [1..10]) $ \n -> do
+  putStr $ "Generating input for length " ++ show n ++ "... "
+  (input, solution) <- randomInput n 26
+  putStr $ "Finished. The solution should be " ++ solution ++ ". Now writing to file... "
+  writeFile ("input" ++ show n) (unlines input)
+  putStrLn "Finished."
