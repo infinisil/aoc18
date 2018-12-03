@@ -19,6 +19,7 @@ import qualified Data.Text.IO               as TIO
 import           Data.Void                  (Void)
 import           GHC.Word                   (Word32)
 import           Paths_aoc2                 (getDataFileName)
+import           System.Directory
 import           System.Environment         (getArgs)
 import           Text.Printf                (printf)
 
@@ -140,9 +141,15 @@ randomInput len chars = do
   return (list ++ [changed], common orig changed)
 
 generateInputs :: IO ()
-generateInputs = forM_ (map (*10000) [1..10]) $ \n -> do
-  putStr $ "Generating input for length " ++ show n ++ "... "
-  (input, solution) <- randomInput n 26
-  putStr $ "Finished. The solution should be " ++ solution ++ ". Now writing to file... "
-  writeFile ("input" ++ show n) (unlines input)
-  putStrLn "Finished."
+generateInputs = do
+  createDirectoryIfMissing True "inputs"
+  solutions <- forM ns $ \n -> do
+    putStr $ "Generating input for length " ++ show n ++ "... "
+    (input, solution) <- randomInput n 26
+    putStr "Finished. Now writing to file... "
+    writeFile ("inputs/" ++ show n ++ ".txt") (unlines input)
+    putStrLn "Finished."
+    return (n, solution)
+  writeFile "inputs/solutions.txt" $ concatMap (\(n, s) -> show n ++ " " ++ s ++ "\n") solutions
+  where
+    ns = [1000,2000..9000] ++ [10000,20000..100000]
