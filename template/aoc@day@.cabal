@@ -23,3 +23,5 @@ executable aoc@day@
                      , text
                      , containers
                      , megaparsec
+                     , containers
+                     , MonadRandom
