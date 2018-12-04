@@ -70,9 +70,11 @@ common (x:xs) (y:ys)
 -- ====================
 
 {-|
-A Quint is a way to encode Strings consisting only of maximum 32 lowercased letters. It is designed to allow for calculating the hamming distance between two of them very fast.
+A Quint is a way to encode Strings consisting only of maximum 32 lowercased letters.
+It is designed to allow for calculating the hamming distance between two of them very fast.
 
-Every Word32 contains a single bit of every character of the string. The least significant bits contain the last character.
+Every Word32 contains a single bit of every character of the string.
+The least significant bits contain the last character.
 -}
 newtype Quint = Quint (Word32, Word32, Word32, Word32, Word32) deriving Eq
 
