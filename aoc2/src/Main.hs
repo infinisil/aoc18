@@ -82,6 +82,8 @@ instance Show Quint where
   show (Quint (q0, q1, q2, q3, q4)) = printf "%032b\n%032b\n%032b\n%032b\n%032b" q0 q1 q2 q3 q4
 
 instance Metric Quint where
+  -- This is the main thing this representation is optimized for
+  -- Calculating the hamming distance between two strings is only a couple bit operations!
   Quint (x0, x1, x2, x3, x4) `distance` Quint (y0, y1, y2, y3, y4) = popCount $
     xor x0 y0 .|. xor x1 y1 .|. xor x2 y2 .|. xor x3 y3 .|. xor x4 y4
 
