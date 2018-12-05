@@ -25,3 +25,4 @@ executable aoc4
                      , megaparsec
                      , MonadRandom
                      , time
+                     , directory

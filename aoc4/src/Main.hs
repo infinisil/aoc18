@@ -16,6 +16,7 @@ import qualified Data.Text.IO               as TIO
 import           Data.Time
 import           Data.Void
 import           Paths_aoc4
+import           System.Directory
 import           System.Environment         (getArgs)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -75,7 +76,10 @@ main = readInput >>= challenges
 readInput :: IO Input
 readInput = do
   inputFile <- getArgs >>= \case
-    [] -> return "input"
+    [] -> do
+      dataFile <- getDataFileName "input"
+      exists <- doesFileExist dataFile
+      return $ if exists then dataFile else "input"
     [file] -> return file
   contents <- TIO.readFile inputFile
   case parse parser "input" contents of
