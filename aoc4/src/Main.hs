@@ -105,17 +105,17 @@ sleepMinutes :: [ShiftEntry] -> SleepMinutes
 sleepMinutes [] = SleepMinutes IntMap.empty
 sleepMinutes (ShiftEntry sleep FallsAsleep:ShiftEntry wake WakesUp:rest) = SleepMinutes x <> sleepMinutes rest where
   m = todMin . localTimeOfDay
-  x = IntMap.fromDistinctAscList (map (,1) [m sleep..m wake])
+  x = IntMap.fromDistinctAscList (map (,1) [m sleep..m wake - 1])
 
-part1 :: Map GuardId SleepMinutes -> Input -> [Int]
-part1 sleeps input = map (maxSleeper*) maxMinutes where
+part1 :: Map GuardId SleepMinutes -> Input -> Int
+part1 sleeps input = maxSleeper * maxMinute where
   maxSleeper = fst . maximumBy (comparing snd) . Map.assocs . collectByGuard (const sleepAmount) $ input
   SleepMinutes minutes = sleeps Map.! maxSleeper
-  maxMinutes = snd . fromJust . maxElemsBy compare . IntMap.assocs $ minutes
+  maxMinute = head . snd . fromJust . maxElemsBy compare . IntMap.assocs $ minutes
 
-part2 :: Map GuardId SleepMinutes -> Input -> [Int]
-part2 sleeps input = map (uncurry (*)) maxes where
-  Just (_, maxes) = doubleMax sleeps
+part2 :: Map GuardId SleepMinutes -> Input -> Int
+part2 sleeps input = gid * minute where
+  Just (_, [(gid, minute)]) = doubleMax sleeps
 
 challenges :: Input -> IO ()
 challenges input = do
