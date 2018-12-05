@@ -28,6 +28,8 @@ type Input = [String]
 parser :: Parsec Void Text Input
 parser = many (many letterChar <* newline) <* eof
 
+howmanychange = 1
+
 main :: IO ()
 main = do
   inputFile <- getArgs >>= \case
@@ -54,7 +56,8 @@ idchecksum str = (2 `elem` charcounts, 3 `elem` charcounts) where
 
 correctid :: Input -> String
 correctid = go BK.empty where
-  go tree (x:xs) = case BK.elemsDistance 1 quints tree of
+  go tree [] = error "No match found"
+  go tree (x:xs) = case BK.elemsDistance howmanychange quints tree of
     []  -> go (BK.insert quints tree) xs
     [q] -> common x (qDecode 26 q)
     where quints = qEncode x
@@ -125,23 +128,25 @@ randomList chars = chunked chars <$> getRandomRs ('a', 'z') where
   chunked n list = chunk : chunked n rest where
     (chunk, rest) = splitAt n list
 
-changeLetter :: MonadRandom m => String -> m String
-changeLetter input = do
-  index <- getRandomR (0, length input - 1)
-  let oldletter = input !! index
-  newletter <- head . filter (/=oldletter) <$> getRandomRs ('a', 'z')
-  return $ replace newletter index input
-  where
-    replace :: a -> Int -> [a] -> [a]
-    replace _ _ []     = error "empty list"
-    replace v 0 (x:xs) = v : xs
-    replace v n (x:xs) = x : replace v (n-1) xs
+-- | @changeLetters k str@ changes randomly chosen k letters in str to a different letter in O(n)
+changeLetters :: MonadRandom m => Int -> String -> m String
+changeLetters number input = go number (length input, input) where
+  go 0 (len, input) = return input
+  go number (len, input) | number >= len = take len <$> getRandomRs ('a', 'z')
+  go number (len, c:cs) = do
+    let prob = fromIntegral number / fromIntegral len :: Double
+    doit <- (prob>) <$> getRandom
+    if doit then do
+      new <- head . filter (/=c) <$> getRandomRs ('a', 'z')
+      (new:) <$> go (number - 1) (len - 1, cs)
+    else
+      (c:) <$> go number (len - 1, cs)
 
 randomInput :: MonadRandom m => Int -> Int -> m (Input, String)
 randomInput len chars = do
   list <- take (len - 1) <$> randomList chars
   orig <- uniform list
-  changed <- changeLetter orig
+  changed <- changeLetters howmanychange orig
   return (list ++ [changed], common orig changed)
 
 generateInputs :: IO ()
