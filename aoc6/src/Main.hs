@@ -93,9 +93,20 @@ part1 input = maximum $ Map.elems xx where
   test = Map.fromListWith (+) $ map ((,1) . findNearest input) field
   xx = Map.withoutKeys test infiniteIndices
 
+doit :: [Tile] -> [(Tile, Int)] -> Int -> [(Tile, Int)]
+doit [] candidates maxDist = candidates
+doit (t:ts) candidates maxDist = doit ts yy maxDist where
+  xx = map (\(tile, v) -> (tile, v + distance tile t)) candidates
+  yy = filter ((<maxDist) . snd) xx
+
+part2 :: Input -> Int -> Int
+part2 ((x, y):xs) maxSize = length $ doit xs init maxSize where
+  init = [ ((xx, yy), d) | xx <- [x - maxSize .. x + maxSize], yy <- [y - maxSize .. y + maxSize], let d = distance (xx, yy) (x, y), d < maxSize ]
+
 challenges :: Input -> IO ()
 challenges input = do
   print input
   print $ part1 input
+  print $ part2 input 10000
   return ()
 
