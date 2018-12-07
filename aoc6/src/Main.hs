@@ -133,7 +133,7 @@ part2 maxSum input = slicesToArea slices where
 -- 1. Walk until we've gone outside the area, mark this as the start
 -- 2. Turn left and step forward until we're in again
 -- 3. Turn right and step forward until we're out again
--- 4. Repeat until we're back at the start again
+-- 4. Repeat 2 and 3 until we're back at the start again
 findOutline :: Turtle ()
 findOutline = do
   isIn <- check
