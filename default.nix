@@ -19,9 +19,15 @@ let
 
   packages = lib.genAttrs days (name: hpkgs.${name});
 
+  combinedBinary = pkgs.writeScriptBin "aoc" (''
+    #!${pkgs.stdenv.shell}
+  '' + lib.concatMapStrings (day: ''
+    ${packages.${day}}/bin/${day}
+  '') days);
+
   combined = pkgs.symlinkJoin {
     name = "aoc";
-    paths = lib.attrValues packages;
+    paths = [combinedBinary] ++ lib.attrValues packages;
   };
 
 in combined // packages // {
