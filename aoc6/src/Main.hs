@@ -122,6 +122,12 @@ printField input = intercalate "\n" [ rr | y <- [ miny - 1 .. maxy + 1 ], let rr
 
 -- | Solves part 2 in runtime O(n + d) where n is the number of points and d is the given maximum distance sum
 --
+-- The algorithm works by controlling a turtle on the field. It has functions to move forward, turn and check
+-- whether the current tile is in the area. The turtle starts at a position within the area, then walks to an
+-- edge of it. Then it turns around and follows the outline in a zig-zag motion, continously checking wether
+-- it's still in the area and reporting this. It stops when it's back at its starting location. In the end all
+-- reports of the area outline are used to calculate the area in a integralish way.
+--
 -- O(n) for finding the median
 -- O(d) comes from having to walk the outline with the turtle while calculating the distance sum for each of the
 -- walked points, so O(o * n) with o being the length of the outline. However, biggest outline is when all n points
