@@ -1,11 +1,15 @@
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 module Main where
 
 import           Control.Applicative        (liftA2)
+import           Control.Monad.RWS.Strict
 import           Data.Char
 import           Data.Functor
+import           Data.IntMap                (IntMap)
+import qualified Data.IntMap                as IntMap
 import           Data.List
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
@@ -14,6 +18,8 @@ import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
 import qualified Data.Text.IO               as TIO
+import           Data.Time.Clock
+import           Data.Time.Clock.System
 import           Data.Void
 import           Paths_aoc6
 import           System.Directory           (doesFileExist)
@@ -31,82 +37,232 @@ type Input = [Tile]
 parser :: Parser Input
 parser = many ((,) <$> decimal <* string ", " <*> decimal <* newline) <* eof
 
-readInput :: IO Input
-readInput = do
+readInput :: FilePath -> IO Input
+readInput inputFile = do
+  contents <- TIO.readFile inputFile
+  case parse parser "input" contents of
+    Left err    -> error $ show err
+    Right input -> return input
+
+time :: IO a -> IO a
+time io = do
+  start <- getSystemTime
+  result <- io
+  stop <- getSystemTime
+  print $ systemToUTCTime stop `diffUTCTime` systemToUTCTime start
+  return result
+
+main :: IO ()
+main = do
   inputFile <- getArgs >>= \case
     [] -> do
       dataFile <- getDataFileName "input"
       exists <- doesFileExist dataFile
       return $ if exists then dataFile else "input"
     [file] -> return file
-  contents <- TIO.readFile inputFile
-  case parse parser "input" contents of
-    Left err    -> error $ show err
-    Right input -> return input
+  readInput inputFile >>= challenges
 
-main :: IO ()
-main = readInput >>= challenges
-
-enclosure' :: Input -> ((Int, Int), (Int, Int))
-enclosure' input = (xs, ys) where
-  xs = liftA2 (,) minimum maximum $ map fst input
-  ys = liftA2 (,) minimum maximum $ map snd input
-
-printField :: Input -> String
-printField input = intercalate "\n" [ rr | y <- [ miny - 1 .. maxy + 1 ], let rr = [ showInt r | x <- [ minx - 1 .. maxx + 1 ], let r = findNearest input (x, y) ]] where
-  ((minx, maxx), (miny, maxy)) = enclosure' input
-  showInt Nothing  = '.'
-  showInt (Just n) = chr (ord 'a' + n)
+challenges :: Input -> IO ()
+challenges input = do
+  time $ print $ part1 input
+  time $ print $ part2 10000 input
+  return ()
 
 
-enclosure :: Input -> ([Tile], [Tile])
-enclosure input = (field, border) where
-  ((minx, maxx), (miny, maxy)) = enclosure' input
-  field = [ (xx, yy) | xx <- [minx .. maxx], yy <- [miny .. maxy] ]
-  border = [ (xx, yy) | xx <- [minx - 1 .. maxx + 1], yy <- [miny - 1 ,  maxy + 1] ]
-        ++ [ (xx, yy) | xx <- [minx - 1 ,  maxx + 1], yy <- [miny - 1 .. maxy + 1] ]
+-- Part 1
+-- ======
 
-uniqueMinimumBy :: (a -> a -> Ordering) -> [a] -> Maybe a
-uniqueMinimumBy f [] = Nothing
-uniqueMinimumBy f (x:xs) = r where
-  r = case go f (x, True) xs of
-    (m, True)  -> Just m
-    (_, False) -> Nothing
-  go :: (a -> a -> Ordering) -> (a, Bool) -> [a] -> (a, Bool)
-  go _ v [] = v
-  go f (y, valid) (x:xs) = case x `f` y of
-    LT -> go f (x, True) xs
-    EQ -> go f (y, False)  xs
-    GT -> go f (y, valid) xs
-
-findNearest :: Input -> Tile -> Maybe Int
-findNearest input tile = fmap snd $ uniqueMinimumBy (comparing fst) $ zip z [0..] where
-  z = map (distance tile) input
+part1 :: Input -> Int
+part1 input = maximum $ Map.elems finiteCounts where
+  (field, border) = enclosure input
+  infiniteIndices = Set.fromList $ map (findNearest input) border
+  counts = Map.fromListWith (+) $ map ((,1) . findNearest input) field
+  finiteCounts = Map.withoutKeys counts infiniteIndices
 
 distance :: Tile -> Tile -> Int
 distance (x1, y1) (x2, y2) = abs (x1 - x2) + abs (y1 - y2)
 
-part1 :: Input -> Int
-part1 input = maximum $ Map.elems xx where
-  (field, border) = enclosure input
-  infiniteIndices = Set.fromList $ map (findNearest input) border
-  test = Map.fromListWith (+) $ map ((,1) . findNearest input) field
-  xx = Map.withoutKeys test infiniteIndices
+bounds :: Input -> ((X, X), (Y, Y))
+bounds input = (xs, ys) where
+  xs = liftA2 (,) minimum maximum $ map fst input
+  ys = liftA2 (,) minimum maximum $ map snd input
 
-doit :: [Tile] -> [(Tile, Int)] -> Int -> [(Tile, Int)]
-doit [] candidates maxDist = candidates
-doit (t:ts) candidates maxDist = doit ts yy maxDist where
-  xx = map (\(tile, v) -> (tile, v + distance tile t)) candidates
-  yy = filter ((<maxDist) . snd) xx
+enclosure :: Input -> ([Tile], [Tile])
+enclosure input = (field, border) where
+  ((minx, maxx), (miny, maxy)) = bounds input
+  field = [ (x, y) | x <- [minx .. maxx], y <- [miny .. maxy] ]
+  border = [ (x, y) | x <- [minx - 1 .. maxx + 1], y <- [miny - 1 ,  maxy + 1] ]
+        ++ [ (x, y) | x <- [minx - 1 ,  maxx + 1], y <- [miny - 1 .. maxy + 1] ]
 
-part2 :: Input -> Int -> Int
-part2 ((x, y):xs) maxSize = length $ doit xs init maxSize where
-  init = [ ((xx, yy), d) | xx <- [x - maxSize .. x + maxSize], yy <- [y - maxSize .. y + maxSize], let d = distance (xx, yy) (x, y), d < maxSize ]
+uniqueMinimumBy :: (a -> a -> Ordering) -> [a] -> Maybe a
+uniqueMinimumBy cmp [] = Nothing
+uniqueMinimumBy cmp (x:xs) = r where
+  r = case go cmp (x, True) xs of
+    (m, True)  -> Just m
+    (_, False) -> Nothing
+  go cmp v [] = v
+  go cmp (y, valid) (x:xs) = case x `cmp` y of
+    LT -> go cmp (x, True) xs
+    EQ -> go cmp (y, False)  xs
+    GT -> go cmp (y, valid) xs
 
-challenges :: Input -> IO ()
-challenges input = do
-  print input
-  print $ part1 input
-  print $ part2 input 10000
-  return ()
+findNearest :: Input -> Tile -> Maybe Int
+findNearest input tile = fmap fst . uniqueMinimumBy (comparing snd) .
+  zip [0..] $ map (distance tile) input
+
+printField :: Input -> String
+printField input = intercalate "\n" [ rr | y <- [ miny - 1 .. maxy + 1 ], let rr = [ showInt r | x <- [ minx - 1 .. maxx + 1 ], let r = findNearest input (x, y) ]] where
+  ((minx, maxx), (miny, maxy)) = bounds input
+  showInt Nothing  = '.'
+  showInt (Just n) = chr (ord 'a' + n)
+
+
+-- Part 2
+-- ======
+
+part2 :: Int -> Input -> Int
+part2 maxSum input = slicesToArea slices where
+  median = medianTile input
+  within tile = (<maxSum) . sum . map (distance tile) $ input
+  initialState = TurtleState median PosX Nothing
+  (_, _, slices) = runRWS findOutline within initialState
+
+-- | Algorithm to find the outline of the area
+--
+-- 0. Make sure we're inside the area
+-- 1. Walk until we've gone outside the area, mark this as the start
+-- 2. Turn left and step forward until we're in again
+-- 3. Turn right and step forward until we're out again
+-- 4. Repeat until we're back at the start again
+findOutline :: Turtle ()
+findOutline = do
+  isIn <- check
+  when isIn $ do
+    stepOutside
+    markStart
+    goround False
+
+-- | Check whether the current tile is in the area
+check :: Turtle Bool
+check = do
+  pos <- gets position
+  ($pos) <$> ask
+
+-- | Go forward through the area until we aren't in the area anymore
+stepOutside :: Turtle ()
+stepOutside = do
+  x <- check
+  when x $ step *> stepOutside
+
+-- | Mark the start of the algorithm at the current position
+markStart :: Turtle ()
+markStart = do
+  pos <- gets position
+  modify $ \state -> state { roundStart = Just pos }
+
+-- | Make a turnaround in the given turn direction until we've switched from in area -> out of area or vice versa.
+-- Then reverse our turn direction and continue. Terminate when we've reached the starting position.
+-- Report each position in the area we find to be inbound
+goround :: Turn -> Turtle ()
+goround t = do
+  turn t
+  end <- step
+  unless end $ do
+    inIt <- maybeReport
+    goround inIt
+
+-- | Do a single step forward, return whether we've reached our starting tile already
+step :: Turtle Bool
+step = do
+  state@TurtleState { direction, position, roundStart } <- get
+  let (x, y) = position
+      newPos = case direction of
+        PosX -> (x + 1, y)
+        NegX -> (x - 1, y)
+        PosY -> (x, y + 1)
+        NegY -> (x, y - 1)
+  put $ state { position = newPos }
+  return $ roundStart == Just newPos
+
+-- | Check whether the current tile is in bounds or not, if it is, report this position as inbound
+maybeReport :: Turtle Bool
+maybeReport = do
+  isIn <- check
+  when isIn $ do
+    pos <- gets position
+    tell $ tileSlice pos
+  return isIn
+
+-- | Turn the turtle either left or right
+turn :: Turn -> Turtle ()
+turn turn = modify mod where
+  mod state@TurtleState { direction } = state { direction = newDir turn direction }
+  newDir :: Turn -> Dir -> Dir
+  newDir True PosX  = PosY
+  newDir True PosY  = NegX
+  newDir True NegX  = NegY
+  newDir True NegY  = PosX
+  newDir False PosY = PosX
+  newDir False NegX = PosY
+  newDir False NegY = NegX
+  newDir False PosX = NegY
+
+
+-- | Finds the median tile in the input, having the unique property of certainly being within the area already
+-- This is because the median has the same amount of tiles up, down, left and right (because we get the middle in x
+-- and the middle in y), meaning any movement will either keep the same summed distance (because we get one block
+-- nearer to the ones above at the same time as we go one block farther from all below, same for left-right) to all
+-- of them or increase it (when we go up and some points are exactly to our left/right, then we increase the
+-- distance to those, while all of the rest stays the same)
+--
+-- Thanks to glguy on Freenode for explaining me this
+medianTile :: Input -> Tile
+medianTile input = (x !! halflen, y !! halflen) where
+  halflen = length input `div` 2
+  x = sort $ map fst input
+  y = sort $ map snd input
+
+
+-- | Slices of a bounded pixelated 2d area. Key represent an X coordinate, Values represent minY, maxY on that X
+-- coordinate. This structure can't represent non-convexity in the Y direction.
+newtype Slices = Slices (IntMap (Y, Y)) deriving Show
+
+-- | Slices get combined by merging each of the X coordinates, taking the mimimum and maximum of the Y coordinates
+-- This means the area between in the Y axis gets filled out
+instance Semigroup Slices where
+  Slices a <> Slices b = Slices $ IntMap.unionWith combine a b where
+    combine (mina, maxa) (minb, maxb) = (min mina minb, max maxa maxb)
+
+instance Monoid Slices where
+  mempty = Slices IntMap.empty
+
+-- | A slice consisting of only a single tile
+tileSlice :: Tile -> Slices
+tileSlice (x, y) = Slices $ IntMap.singleton x (y, y)
+
+-- | Calculates the are of these slices, essentially integration.
+slicesToArea :: Slices -> Int
+slicesToArea (Slices m) = IntMap.foldr (\(mi, ma) s -> s + ma - mi + 1) 0 m
+
+-- | A turtle program does
+-- - Read a function for determining whether a tile is in the area or not
+-- - Write out the slices representing the reported area
+-- - have a State for the turtle
+type Turtle = RWS (Tile -> Bool) Slices TurtleState
+
+-- | The state of the turtle
+data TurtleState = TurtleState
+  { position   :: Tile -- ^ Our current position
+  , direction  :: Dir -- ^ Our current direction
+  , roundStart :: Maybe Tile -- ^ Whether the round started already and where it started
+  }
+
+data Dir = PosX
+         | NegX
+         | PosY
+         | NegY
+
+-- | A turn direction, either left, represented by False, or right, represented by True
+type Turn = Bool
+
 

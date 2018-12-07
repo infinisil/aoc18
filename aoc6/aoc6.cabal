@@ -25,3 +25,5 @@ executable aoc6
                      , megaparsec
                      , MonadRandom
                      , directory
+                     , mtl
+                     , time
