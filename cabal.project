@@ -4,3 +4,4 @@ packages: ./aoc1
           ./aoc4
           ./aoc5
           ./aoc6
+          ./aoc7
