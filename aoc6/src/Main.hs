@@ -120,6 +120,15 @@ printField input = intercalate "\n" [ rr | y <- [ miny - 1 .. maxy + 1 ], let rr
 -- Part 2
 -- ======
 
+-- | Solves part 2 in runtime O(n + d) where n is the number of points and d is the given maximum distance sum
+--
+-- O(n) for finding the median
+-- O(d) comes from having to walk the outline with the turtle while calculating the distance sum for each of the
+-- walked points, so O(o * n) with o being the length of the outline. However, biggest outline is when all n points
+-- are in a single tile. In that case, walking tiles in any direction from the center will increase the distance
+-- sum by n every time (one additional unit to every point), we can go out maximum d/n tiles before reaching a
+-- distance sum of d. This in turn also means that the outline is asymptotically bounded by d/n, which means
+-- that the complexity of this step is bounded by d/n * n = d
 part2 :: Int -> Input -> Int
 part2 maxSum input = slicesToArea slices where
   median = medianTile input
@@ -217,10 +226,22 @@ turn turn = modify mod where
 --
 -- Thanks to glguy on Freenode for explaining me this
 medianTile :: Input -> Tile
-medianTile input = (x !! halflen, y !! halflen) where
-  halflen = length input `div` 2
-  x = sort $ map fst input
-  y = sort $ map snd input
+medianTile input = (median $ map fst input, median $ map snd input)
+
+-- | Calculates the median in O(n) average time using quickselect
+--
+-- Adjusted from https://rosettacode.org/wiki/Averages/Median#Haskell
+median :: (Integral a, Ord a) => [a] -> a
+median [] = error "No elements"
+median xs = nth xs (length xs `div` 2) where
+  nth :: Ord t => [t] -> Int -> t
+  nth (x:xs) n
+    | k == n = x
+    | k > n = nth ys n
+    | otherwise = nth zs $ n - k - 1
+    where
+      (ys, zs) = partition (< x) xs
+      k = length ys
 
 
 -- | Slices of a bounded pixelated 2d area. Key represent an X coordinate, Values represent minY, maxY on that X
