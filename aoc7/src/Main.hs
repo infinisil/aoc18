@@ -136,7 +136,6 @@ allTasks input = nub $ map fst input ++ map snd input
 
 challenges :: Input -> IO ()
 challenges input = do
-  print input
   let all = allTasks input
   print $ dothem all input
   print $ evalState (passMinute 0) (WorkerState all input (replicate 5 Nothing))
