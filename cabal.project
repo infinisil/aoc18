@@ -5,3 +5,4 @@ packages: ./aoc1
           ./aoc5
           ./aoc6
           ./aoc7
+          ./aoc8
