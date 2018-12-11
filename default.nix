@@ -7,12 +7,13 @@ let
   inherit (pkgs) lib;
   hpkgs = pkgs.haskellPackages.extend extension;
 
-  days = lib.filter (lib.hasPrefix "aoc") (lib.attrNames (builtins.readDir ./.));
+  days = lib.filter (day: builtins.pathExists (./. + "/${day}")) (map (n: "aoc" + toString n) (lib.range 1 25));
 
   extension = self: super: lib.genAttrs days (name:
     self.callCabal2nix name (lib.sourceByRegex (./. + "/${name}") [
       "^src.*$"
       "^input$"
+      "^letters$"
       "^.*\\.cabal$"
     ]) {}
   );

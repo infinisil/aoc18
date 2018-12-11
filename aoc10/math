@@ -1,0 +1,43 @@
+We have 2 points with initial Y positions p1, p2 and Y velocities v1, v2.
+Their Y position at time t is given by yn(t) = pn + t * vn.
+We need to find t where | y1(t) - y2(t) | <= n where n is our letter height.
+  
+	| y1(t) - y2(t) | <= n
+	| p1 + t * v1 - p2 - t * v2 | <= n
+	| (p1 - p2) + t * (v1 - v2) | <= n
+
+Let b = p1 - p2 and k = v1 - v2. We choose the points such that k >= 0 -> v1 - v2 >= 0 -> v1 >= v2, and we require that k != 0 -> v1 != v2.
+
+Need to find all solutions for given b, k, n:
+
+  | b + t * k | <= n
+	b + t * k <= n  &&  -b - t * k <= n
+
+First condition holds when
+
+  b + t * k <= n
+	b - n <= - t * k     // k >= 0
+	(b - n) / -k >= t
+	(n - b) / k >= t
+	t = [..maxt] with maxt = floor ((n - b) / k)
+
+Second condition holds when
+
+  -b - t * k <= n
+	-b - n <= t * k     // k >= 0
+	(-b - n) / k <= t
+	(-n - b) / k <= t
+	t = [mint..] with mint = ceil ((-n - b) / k)
+
+So both conditions hold when
+
+  ceil ((-n - b) / k) <= t <= floor ((n - b) / k)
+
+We want to calculate ceil/floor of integer divisions without using floating point numbers. Let `div` denote integer division
+
+floor (p / q) = p `div` q
+ceil (p / q) = (p + q - 1) `div` q
+
+So in the end we have
+
+  t = [ (-n - b + k - 1) `div` k .. (n - b) `div` k ]
