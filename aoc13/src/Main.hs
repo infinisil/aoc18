@@ -21,10 +21,9 @@ import           Text.Megaparsec.Char
 type Parser = Parsec Void Text
 
 
-data Straight = Horizontal | Vertical deriving Show
 data Corner = Positive | Negative deriving Show
 
-data Tile = Straight Straight
+data Tile = Straight
           | Corner Corner
           | Intersection
           | Empty
@@ -62,7 +61,7 @@ deflect Negative (fromEnum -> val) = toEnum $ val `xor` (bit 0 .|. bit 1)
 
 newDirDec :: Tile -> Direction -> Decision -> (Direction, Decision)
 newDirDec tile dir dec = case (tile, dec) of
-  (Straight _, _)            -> (dir, dec)
+  (Straight, _)              -> (dir, dec)
   (Corner corner, _)         -> (deflect corner dir, dec)
   (Intersection, GoStraight) -> (dir, GoRight)
   (Intersection, GoLeft)     -> (turn False dir, GoStraight)
@@ -80,15 +79,15 @@ parser = bimap V.fromList Map.unions . unzip <$> many parseLine
     let cart = Map.singleton (Coord (unPos column - 1, unPos line - 1)) . Cart GoLeft
     notChar '\n' >>= \c -> return $ case c of
       ' '  -> (Empty, Map.empty)
-      '-'  -> (Straight Horizontal, Map.empty)
-      '|'  -> (Straight Horizontal, Map.empty)
+      '-'  -> (Straight, Map.empty)
+      '|'  -> (Straight, Map.empty)
       '/'  -> (Corner Positive, Map.empty)
       '\\' -> (Corner Negative, Map.empty)
       '+'  -> (Intersection, Map.empty)
-      '>'  -> (Straight Horizontal, cart R)
-      '<'  -> (Straight Horizontal, cart L)
-      '^'  -> (Straight Vertical, cart U)
-      'v'  -> (Straight Vertical, cart D)
+      '>'  -> (Straight, cart R)
+      '<'  -> (Straight, cart L)
+      '^'  -> (Straight, cart U)
+      'v'  -> (Straight, cart D)
 
 readInput :: IO Input
 readInput = do
