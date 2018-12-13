@@ -1,8 +1,10 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE ViewPatterns #-}
 module Main where
 
 import           Control.Monad.State
 import           Data.Bifunctor
+import           Data.Bits
 import           Data.Map             (Map)
 import qualified Data.Map             as Map
 import           Data.Text            (Text)
@@ -28,7 +30,7 @@ data Tile = Straight Straight
           | Empty
           deriving Show
 
-data Direction = U | D | L | R deriving Show
+data Direction = U | R | D | L deriving (Show, Enum)
 data Decision = GoLeft | GoStraight | GoRight deriving Show
 data Cart = Cart Decision Direction deriving Show
 
@@ -50,27 +52,22 @@ delta (Coord (x, y)) dir = Coord $ case dir of
   L -> (x - 1, y)
   R -> (x + 1, y)
 
+turn :: Bool -> Direction -> Direction
+turn True (fromEnum -> val)  = toEnum $ (val + 1) `mod` 4
+turn False (fromEnum -> val) = toEnum $ (val - 1) `mod` 4
+
+deflect :: Corner -> Direction -> Direction
+deflect Positive (fromEnum -> val) = toEnum $ val `xor` bit 0
+deflect Negative (fromEnum -> val) = toEnum $ val `xor` (bit 0 .|. bit 1)
+
 newDirDec :: Tile -> Direction -> Decision -> (Direction, Decision)
-newDirDec tile dir dec = case (tile, dir, dec) of
-  (Straight _, _, _)            -> (dir, dec)
-  (Corner Positive, U, _)       -> (R, dec)
-  (Corner Positive, R, _)       -> (U, dec)
-  (Corner Positive, D, _)       -> (L, dec)
-  (Corner Positive, L, _)       -> (D, dec)
-  (Corner Negative, U, _)       -> (L, dec)
-  (Corner Negative, L, _)       -> (U, dec)
-  (Corner Negative, D, _)       -> (R, dec)
-  (Corner Negative, R, _)       -> (D, dec)
-  (Intersection, _, GoStraight) -> (dir, GoRight)
-  (Intersection, D, GoLeft)     -> (R, GoStraight)
-  (Intersection, U, GoLeft)     -> (L, GoStraight)
-  (Intersection, L, GoLeft)     -> (D, GoStraight)
-  (Intersection, R, GoLeft)     -> (U, GoStraight)
-  (Intersection, D, GoRight)    -> (L, GoLeft)
-  (Intersection, U, GoRight)    -> (R, GoLeft)
-  (Intersection, L, GoRight)    -> (U, GoLeft)
-  (Intersection, R, GoRight)    -> (D, GoLeft)
-  (Empty, _, _)                 -> error "Your cart derailed!"
+newDirDec tile dir dec = case (tile, dec) of
+  (Straight _, _)            -> (dir, dec)
+  (Corner corner, _)         -> (deflect corner dir, dec)
+  (Intersection, GoStraight) -> (dir, GoRight)
+  (Intersection, GoLeft)     -> (turn False dir, GoStraight)
+  (Intersection, GoRight)    -> (turn True dir, GoLeft)
+  (Empty, _)                 -> error "Your cart derailed!"
 
 parser :: Parser Input
 parser = bimap V.fromList Map.unions . unzip <$> many parseLine
