@@ -33,20 +33,22 @@ challenges :: Input -> IO ()
 challenges input = do
   print $ snd $ generation input 20
   print $ snd $ generation input 50000000000
+  --mapM_ (putStrLn . showField . fst . generation input) [0..]
   return ()
 
 generation :: Input -> Int -> ([Bool], Int)
-generation (Input init _) n = findN n detectUnchanging where
+generation (Input init _) = findN detectUnchanging where
   iterations = iterate step (0, init)
   detectUnchanging = zipWith unchanged iterations (tail iterations)
   unchanged (i, this) (j, next)
     | this == next = ((i, this), Just (j - i))
     | otherwise = ((i, this), Nothing)
 
-findN :: Int -> [((Int, [Bool]), Maybe Int)] -> ([Bool], Int)
-findN 0 (((startIndex, tape), _):_) = (tape, sum $ zipWith (\i v -> if v then i else 0) [startIndex ..] tape)
-findN n (((startIndex, tape), Just diff):_) = (tape, sum $ zipWith (\i v -> if v then i + n * diff else 0) [startIndex ..] tape)
-findN n ((_, Nothing):rest) = findN (n - 1) rest
+
+findN :: [((Int, [Bool]), Maybe Int)] -> Int -> ([Bool], Int)
+findN (((startIndex, tape), _):_) 0 = (tape, sum $ zipWith (\i v -> if v then i else 0) [startIndex ..] tape)
+findN (((startIndex, tape), Just diff):_) n = (tape, sum $ zipWith (\i v -> if v then i + n * diff else 0) [startIndex ..] tape)
+findN ((_, Nothing):rest) n = findN rest (n - 1)
 
 rulesToMap :: [Rule] -> Map (P, P, P, P, P) P
 rulesToMap rules = Map.fromList $ map (\(Rule c r) -> (c, r)) rules

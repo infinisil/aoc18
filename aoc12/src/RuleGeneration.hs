@@ -11,6 +11,9 @@ import           Data.Text                  (Text)
 import qualified Data.Text.IO               as TIO
 import           Data.Void
 import           Language.Haskell.TH
+import           Paths_aoc12
+import           System.Directory           (doesFileExist)
+import           System.Environment         (getArgs)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import           Text.Megaparsec.Char.Lexer
@@ -51,7 +54,14 @@ data Rule' = Rule' [P] (P, P)
 
 readInput :: IO Input
 readInput = do
-  contents <- TIO.readFile "input"
+  inputFile <- getArgs >>= \case
+    [] -> do
+      dataFile <- getDataFileName "input"
+      exists <- doesFileExist dataFile
+      return $ if exists then dataFile else "input"
+    [file] -> return file
+    _ -> return "input"
+  contents <- TIO.readFile inputFile
   case parse parser "input" contents of
     Left err    -> fail $ show err
     Right input -> return input
