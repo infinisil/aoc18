@@ -25,3 +25,4 @@ executable aoc12
                      , megaparsec
                      , MonadRandom
                      , directory
+                     , data-fix
