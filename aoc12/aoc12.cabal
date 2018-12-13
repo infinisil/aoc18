@@ -17,6 +17,7 @@ executable aoc12
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Paths_aoc12
+                       RuleGeneration
   default-language:    Haskell2010
   ghc-options:         
   build-depends:       base >= 4.7 && < 5
@@ -26,3 +27,4 @@ executable aoc12
                      , MonadRandom
                      , directory
                      , data-fix
+                     , template-haskell
