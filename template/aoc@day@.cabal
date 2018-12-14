@@ -25,3 +25,5 @@ executable aoc@day@
                      , megaparsec
                      , MonadRandom
                      , directory
+                     , mtl
+                     , time
