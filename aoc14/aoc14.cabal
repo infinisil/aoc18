@@ -17,6 +17,8 @@ executable aoc14
   hs-source-dirs:      src
   main-is:             Main.hs
   other-modules:       Paths_aoc14
+                       SeqDetector
+                       KMP
   default-language:    Haskell2010
   ghc-options:         
   build-depends:       base >= 4.7 && < 5
@@ -28,3 +30,5 @@ executable aoc14
                      , mtl
                      , time
                      , vector
+                     , data-fix
+                     , array

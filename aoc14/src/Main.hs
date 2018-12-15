@@ -1,11 +1,14 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 module Main where
 
 import           Control.Monad.Cont
 import           Control.Monad.ST
 import           Control.Monad.State
 import           Data.Bifunctor
+import           Data.List
 import           Data.Text                   (Text)
 import qualified Data.Text.IO                as TIO
 import           Data.Time.Clock
@@ -22,7 +25,27 @@ import           Text.Megaparsec             hiding (State)
 import           Text.Megaparsec.Char
 import           Text.Megaparsec.Char.Lexer
 
+import qualified SeqDetector                 as D
+
+type Parser = Parsec Void Text
+
 type Input = Int
+
+parser :: Parser Input
+parser = decimal
+
+readInput :: IO Input
+readInput = do
+  inputFile <- getArgs >>= \case
+    [] -> do
+      dataFile <- getDataFileName "input"
+      exists <- doesFileExist dataFile
+      return $ if exists then dataFile else "input"
+    [file] -> return file
+  contents <- TIO.readFile inputFile
+  case parse parser "input" contents of
+    Left err    -> fail $ show err
+    Right input -> return input
 
 time :: IO a -> IO a
 time io = do
@@ -35,12 +58,11 @@ time io = do
 part1' :: Input -> IV.Vector Word8
 part1' input = runST (steps input)
 
-
 steps :: forall s . Input -> ST s (IV.Vector Word8)
 steps input = do
   arr <- V.unsafeNew (2 + input * 2)
-  V.write arr 0 3
-  V.write arr 1 7
+  V.unsafeWrite arr 0 3
+  V.unsafeWrite arr 1 7
   step' (input + 10) (2, (0, 1)) arr
   IV.freeze (V.take 10 (V.drop input arr))
 
@@ -60,45 +82,74 @@ step' n (size, (i1, i2)) arr
 
     step' n (newsize, (newi1, newi2)) arr
 
-type A s = ContT Int (StateT ((Int, V.MVector s Word8), SeqState) (ST s))
 
-push :: forall s . Word8 -> (Int -> A s Int) -> A s ()
-push val exit = do
-  ((size, arr), st) <- get
-  case next st val of
-    Nothing -> exit (size - 5) *> return ()
-    Just st' -> do
-      newarr <- if V.length arr == size then trace ("Growing by " ++ show size) $ V.grow arr size else return arr
-        --V.grow arr size
-      V.write newarr size val
-      put ((size + 1, newarr), st')
+data AState s = AState
+  { size     :: Int
+  , arr      :: V.MVector s Word8
+  , seqState :: D.State
+  , indices  :: (Int, Int)
+  }
 
-part2 :: Int
-part2 = runST $ do
-  arr <- V.unsafeNew 21000000
-  V.write arr 0 3
-  V.write arr 1 7
-  evalStateT (runContT (callCC (step'' (0, 1))) return) ((2, arr), N)
+type CST s = ContT Int (StateT (AState s) (ST s))
 
-step'' :: forall s . (Int, Int) -> (Int -> A s Int) -> A s Int
-step'' (i1, i2) exit = do
-  v1 <- gets (snd . fst) >>= flip V.read i1
-  v2 <- gets (snd . fst) >>= flip V.read i2
+push :: forall s a . (D.State -> Word8 -> (Bool, D.State)) -> Word8 -> (Int -> CST s ()) -> CST s ()
+push d val exit = do
+  AState size arr st i <- get
+  {-# SCC "case" #-} case d st val of
+    (True, _) -> exit (size - 5)
+    (False, st') -> do
+      newarr <- if V.length arr == size then V.unsafeGrow arr size else return arr
+      V.unsafeWrite newarr size val
+      put $ AState (size + 1) newarr st' i
+
+digits :: forall i . Integral i => i -> [i]
+digits 0 = [0]
+digits n = reverse $ go n where
+  go :: i -> [i]
+  go 0 = []
+  go n = r : go d where
+    (d, r) = quotRem n 10
+
+part2 :: Input -> Int
+part2 input = runST $ do
+  arr <- V.unsafeNew 2
+  V.unsafeWrite arr 0 3
+  V.unsafeWrite arr 1 7
+  let d = D.detector (map fromIntegral $ digits input)
+  flip evalStateT (AState 2 arr D.initial (0, 1)) $
+    runContT (callCC (step'' d)) return
+
+step'' :: forall s . (D.State -> Word8 -> (Bool, D.State)) -> (Int -> CST s ()) -> CST s Int
+step'' d exit = do
+  AState _ arr _ (i1, i2) <- get
+  v1 <- V.unsafeRead arr i1
+  v2 <- V.unsafeRead arr i2
   let (n1, n2) = (v1 + v2) `divMod` 10
 
-  if n1 /= 0 then do
-    push n1 exit
-    push n2 exit
+  {-# SCC "ifthing" #-}if n1 /= 0 then do
+    push d n1 exit
+    push d n2 exit
   else
-    push n2 exit
+    push d n2 exit
   --when (n1 /= 0) $ push arr n1
   --push arr n2
-  size <- gets (fst . fst)
+  s <- gets size
 
-  let newi1 = (i1 + fromIntegral v1 + 1) `mod` size
-  let newi2 = (i2 + fromIntegral v2 + 1) `mod` size
+  let newi1 = (i1 + fromIntegral v1 + 1) `mod` s
+  let newi2 = (i2 + fromIntegral v2 + 1) `mod` s
 
-  step'' (newi1, newi2) exit
+  modify $ \state -> state { indices = (newi1, newi2) }
+
+  step'' d exit
+
+newtype Digit = Digit Word8 deriving (Eq, Ord, Num, Enum, Real, Integral)
+
+instance Show Digit where
+  show (Digit n) = show n
+
+instance Bounded Digit where
+  minBound = Digit 0
+  maxBound = Digit 9
 
 data SeqState = N
               | N8
@@ -107,35 +158,32 @@ data SeqState = N
               | N8648
               | N86480
 
-next :: SeqState -> Word8 -> Maybe SeqState
-next N 8      = Just N8
-next N _      = Just N
-next N8 6     = Just N86
-next N8 8     = Just N8
-next N8 _     = Just N
-next N86 4    = Just N864
-next N86 8    = Just N8
-next N86 _    = Just N
-next N864 8   = Just N8648
-next N864 _   = Just N
-next N8648 0  = Just N86480
-next N8648 6  = Just N86
-next N8648 _  = Just N
-next N86480 1 = Nothing
-next N86480 _ = Just N
+next :: SeqState -> Word8 -> (Bool, SeqState)
+next N 8      = (False, N8)
+next N _      = (False, N)
+next N8 6     = (False, N86)
+next N8 8     = (False, N8)
+next N8 _     = (False, N)
+next N86 4    = (False, N864)
+next N86 8    = (False, N8)
+next N86 _    = (False, N)
+next N864 8   = (False, N8648)
+next N864 _   = (False, N)
+next N8648 0  = (False, N86480)
+next N8648 6  = (False, N86)
+next N8648 _  = (False, N)
+next N86480 1 = (True, N)
+next N86480 _ = (False, N)
 
 
 main :: IO ()
-main = do
-  input <- getArgs >>= \case
-    [] -> return 864801
-    [arg] -> return $ read arg
-  challenges input
+main = readInput >>= challenges
 
 challenges :: Input -> IO ()
 challenges input = do
+  print input
   print $ part1' input
-  print $ part2
+  print $ part2 input
   return ()
 
 nextRecipes :: Int -> Int -> [Int]
