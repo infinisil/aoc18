@@ -19,11 +19,11 @@ newtype State = State Word8
 newtype Fun a = Fun (Word8 -> Maybe a) deriving Functor
 
 test :: [Word8] -> Fix Fun
-test seq = ana f (0, 0) where
-  f :: (Int, Int) -> Fun (Int, Int)
-  f (i, j) = Fun $ \input -> case n i j input of
-    (Just _, _, _)    -> Nothing
-    (Nothing, i', j') -> Just (i', j')
+test seq = ana f 0 where
+  f :: Int -> Fun Int
+  f j = Fun $ \input -> case n j input of
+    (True, _)   -> Nothing
+    (False, j') -> Just j'
   n = next (build seq)
 
 initial = State 0

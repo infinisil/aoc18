@@ -35,6 +35,7 @@ import           Data.Array (Array, bounds, listArray, (!))
 data Table a = Table
   { alphabetTable :: Array Int a
   , jumpTable     :: Array Int Int
+  , len           :: Int
   } deriving Show
 
 -- |The 'build' function eats a pattern (list of some Eq) and generates a KMP table.
@@ -48,6 +49,7 @@ build pattern =
     resTable = Table
       { alphabetTable = listArray (0,len-1) pattern
       , jumpTable = listArray (-1,len-1) $ (-2) : genJump (-1) 0
+      , len = len
       }
 
     genJump _ 0 =
@@ -82,11 +84,10 @@ build pattern =
   in
     resTable
 
-next :: Eq a => Table a -> (Int -> Int -> a -> (Maybe Int, Int, Int))
-next table = \i j s -> if
-  | j < 0 || j < len && s == alphabetTable table ! j -> (if j + 1 == len then Just (i + 1 - len) else Nothing, i + 1, j + 1)
-  | otherwise -> next table i (1 + (jumpTable table ! (j - 1))) s
-  where len = 1 + snd ( bounds (alphabetTable table))
+next :: Eq a => Table a -> Int -> a -> (Bool, Int)
+next table j s
+  | j < 0 || j < len table && s == alphabetTable table ! j = (j + 1 == len table, j + 1)
+  | otherwise = next table (1 + (jumpTable table ! (j - 1))) s
 
 
 -- |The 'match' function takes the KMP table and a list to be searched (might be infinite)
@@ -94,15 +95,9 @@ next table = \i j s -> if
 --
 -- The time complexity is O(length of the pattern + length of the searched list)
 match :: Eq a => Table a -> [a] -> [Int]
-match table str
-  | len == 0 = 0 : go 0 0 str
-  | otherwise = go 0 0 str
+match table str = [ 0 | len table == 0 ] ++ go (1 - len table) 0 str
   where
-    len = 1 + snd ( bounds (alphabetTable table) )
-
-    n = next table
-
     go i j [] = []
-    go i j (s:ss) = case n i j s of
-      (Nothing, i', j') -> go i' j' ss
-      (Just s, i', j')  -> s : go i' j' ss
+    go i j (s:ss) = case next table j s of
+      (False, j') -> go (i + 1) j' ss
+      (True, j')  -> i : go (i + 1) j' ss
