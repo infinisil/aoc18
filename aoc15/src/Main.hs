@@ -76,23 +76,36 @@ parser = uncurry Input . bimap V.fromList mconcat . unzip <$> many parseLine <* 
 nextMove :: Units -> Type -> (Int, Int) -> Walls -> Maybe (Int, Int)
 nextMove units target starting walls
   -- Can't move if surrounded
-  | null (Set.filter (\k -> not (walls k) && not (Map.member k units)) (nextTo starting)) = Nothing
-  | otherwise = go (Map.fromSet id (Set.filter (\k -> not (walls k) && not (Map.member k units)) (nextTo starting))) (liftA2 (||) (starting==) walls)
+  | null freeSurrounding = Nothing
+  -- Start the path search with all free surrounding spaces, our walls now include the starting tile (we don't want to include this in the future)
+  | otherwise = go (Map.fromSet id freeSurrounding) (liftA2 (||) (starting==) walls)
   where
+    freeSurrounding = Set.filter (isFree walls units) (nextTo starting)
+
+    -- | Takes a map mapping from which positions we're taking into account currently to the first path part of it
+    -- Returns the next step we should take
     go :: Map (Int, Int) (Int, Int) -> Walls -> Maybe (Int, Int)
     go ways walls
-      | not (null targets) = Just $ snd $ Map.findMin targets
-      | null next' = Nothing
-      | otherwise = go next' (liftA2 (||) (\k -> Map.member k ways) walls)
+      -- We found a tile that's next to a target, return the smallest one (reading order)
+      | not (null targs) = Just $ snd $ Map.findMin targs
+      -- We don't have any more tiles we could explore, no destination to move to
+      | null next = Nothing
+      -- We haven't fonud anything in this round, expand to new territorry while blocking the already visited
+      | otherwise = go next (liftA2 (||) (\k -> Map.member k ways) walls)
       where
-        targets = Map.filterWithKey (\k v -> any (\x -> maybe False ((==target) . unitType) $ Map.lookup x units) (Set.filter (\y -> not (walls y) && not (maybe False ((/=target) . unitType) $ Map.lookup y units)) (nextTo k))) ways
-        next = Map.foldlWithKey (\a k v -> let
-                               n = Set.filter (\k -> not (maybe False ((/=target) . unitType) $ Map.lookup k units) && not (walls k)) $ nextTo k
-                               m = Map.fromSet (const v) n
-                             in Map.unionWith min a m
-                           ) Map.empty ways
-        next' = Map.withoutKeys next (Map.keysSet ways)
+        targs = Map.filterWithKey isNextToTarget ways
+        isNextToTarget k _ = any (isType target units) (nextTo k)
+        combine a k v = Map.unionWith min a (Map.fromSet (const v) n) where
+          -- Only empty or target fields
+          n = Set.filter (\k -> maybe True ((==target) . unitType) (Map.lookup k units) && not (walls k)) $ nextTo k
 
+        next = Map.foldlWithKey combine Map.empty ways
+
+isFree :: Walls -> Units -> (Int, Int) -> Bool
+isFree w units coords = not (w coords) && not (Map.member coords units)
+
+isType :: Type -> Map (Int, Int) Unit -> (Int, Int) -> Bool
+isType t units coords = maybe False ((==t) . unitType) $ Map.lookup coords units
 
 printField :: (Int, Int) -> Walls -> StateT Units IO ()
 printField (maxX, maxY) walls = do
